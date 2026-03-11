@@ -3,6 +3,7 @@ import { formatTime, getViralScoreColor, getViralScoreBg } from "@/lib/mockData"
 import { Play, Download, RefreshCw, Clock, Sparkles, Hash, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ExportDialog } from "@/components/ExportDialog";
 import { toast } from "sonner";
 
 const categoryLabels: Record<string, string> = {
