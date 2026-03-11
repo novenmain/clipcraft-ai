@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import { AnalysisStep, Clip, VideoMetadata } from "@/types/clip";
-import { mockClips, mockVideoMetadata, extractYouTubeId } from "@/lib/mockData";
+import { extractYouTubeId } from "@/lib/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export function useVideoAnalysis() {
   const [url, setUrl] = useState("");
@@ -21,23 +23,84 @@ export function useVideoAnalysis() {
     setVideoId(id);
     setClips([]);
 
-    // Simulate processing pipeline
+    // Step 1 - Fetch metadata via noembed (free, no API key)
     setStep("fetching");
-    await new Promise((r) => setTimeout(r, 1500));
+    let videoTitle = "";
+    try {
+      const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${id}`);
+      const data = await res.json();
+      const meta: VideoMetadata = {
+        title: data.title || "Unknown Video",
+        channel: data.author_name || "Unknown Channel",
+        duration: "~30:00",
+        durationSeconds: 1800,
+        thumbnail: `https://img.youtube.com/vi/${id}/maxresdefault.jpg`,
+        views: "",
+        publishedAt: "",
+      };
+      videoTitle = meta.title;
+      setMetadata(meta);
+    } catch {
+      setMetadata({
+        title: "YouTube Video",
+        channel: "Unknown",
+        duration: "~30:00",
+        durationSeconds: 1800,
+        thumbnail: `https://img.youtube.com/vi/${id}/maxresdefault.jpg`,
+        views: "",
+        publishedAt: "",
+      });
+    }
 
-    setMetadata({ ...mockVideoMetadata, thumbnail: `https://img.youtube.com/vi/${id}/maxresdefault.jpg` });
-
+    // Step 2 - Transcribing (we'll skip actual transcription for now, AI will generate based on context)
     setStep("transcribing");
-    await new Promise((r) => setTimeout(r, 2500));
+    await new Promise((r) => setTimeout(r, 1000));
 
+    // Step 3 - AI Analysis
     setStep("analyzing");
-    await new Promise((r) => setTimeout(r, 2000));
 
-    setStep("detecting");
-    await new Promise((r) => setTimeout(r, 1800));
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("analyze-video", {
+        body: {
+          youtubeUrl: inputUrl,
+          videoTitle,
+          transcript: null, // No transcript extraction yet - AI generates based on video context
+        },
+      });
 
-    setClips(mockClips);
-    setStep("complete");
+      if (fnError) {
+        throw new Error(fnError.message || "Analysis failed");
+      }
+
+      if (data?.error) {
+        if (data.error.includes("Rate limited")) {
+          toast.error("Rate limited — please wait a moment and try again.");
+        } else if (data.error.includes("credits")) {
+          toast.error("AI credits exhausted. Add credits in Settings → Workspace → Usage.");
+        } else {
+          toast.error(data.error);
+        }
+        setStep("idle");
+        setError(data.error);
+        return;
+      }
+
+      setStep("detecting");
+      await new Promise((r) => setTimeout(r, 800));
+
+      if (data?.clips && Array.isArray(data.clips)) {
+        setClips(data.clips);
+        setStep("complete");
+        toast.success(`Found ${data.clips.length} clip candidates!`);
+      } else {
+        throw new Error("No clips returned from analysis");
+      }
+    } catch (e: any) {
+      console.error("Analysis error:", e);
+      setError(e.message || "Analysis failed. Please try again.");
+      setStep("idle");
+      toast.error("Analysis failed. Please try again.");
+    }
   }, []);
 
   const reset = useCallback(() => {
