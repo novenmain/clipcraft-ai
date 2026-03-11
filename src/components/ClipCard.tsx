@@ -3,6 +3,7 @@ import { formatTime, getViralScoreColor, getViralScoreBg } from "@/lib/mockData"
 import { Play, Download, RefreshCw, Clock, Sparkles, Hash, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ExportDialog } from "@/components/ExportDialog";
 import { toast } from "sonner";
 
 const categoryLabels: Record<string, string> = {
@@ -81,9 +82,11 @@ export function ClipCard({ clip }: { clip: Clip }) {
         <Button size="sm" className="flex-1 gap-1.5" onClick={() => toast.info("Video preview coming soon with backend integration")}>
           <Play className="w-3.5 h-3.5" /> Preview
         </Button>
-        <Button size="sm" variant="secondary" className="flex-1 gap-1.5" onClick={() => toast.info("Download coming soon with backend integration")}>
-          <Download className="w-3.5 h-3.5" /> Export
-        </Button>
+        <ExportDialog clip={clip}>
+          <Button size="sm" variant="secondary" className="flex-1 gap-1.5">
+            <Download className="w-3.5 h-3.5" /> Export
+          </Button>
+        </ExportDialog>
         <Button size="sm" variant="outline" className="gap-1.5" onClick={() => toast.info("Regeneration coming soon with AI backend")}>
           <RefreshCw className="w-3.5 h-3.5" />
         </Button>
