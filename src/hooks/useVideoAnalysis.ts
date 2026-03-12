@@ -23,7 +23,7 @@ export function useVideoAnalysis() {
     setVideoId(id);
     setClips([]);
 
-    // Step 1 - Fetch metadata via noembed (free, no API key)
+    // Step 1 — Fetch metadata via noembed
     setStep("fetching");
     let videoTitle = "";
     try {
@@ -52,11 +52,45 @@ export function useVideoAnalysis() {
       });
     }
 
-    // Step 2 - Transcribing (we'll skip actual transcription for now, AI will generate based on context)
+    // Step 2 — Fetch real transcript
     setStep("transcribing");
-    await new Promise((r) => setTimeout(r, 1000));
+    let transcript: string | null = null;
 
-    // Step 3 - AI Analysis
+    try {
+      const { data: transcriptData, error: transcriptError } = await supabase.functions.invoke("fetch-transcript", {
+        body: { videoId: id },
+      });
+
+      if (!transcriptError && transcriptData) {
+        transcript = transcriptData.transcript || null;
+
+        // Update duration if we got it from YouTube page
+        if (transcriptData.durationSeconds) {
+          setMetadata((prev) => {
+            if (!prev) return prev;
+            const totalSecs = transcriptData.durationSeconds;
+            const mins = Math.floor(totalSecs / 60);
+            const secs = totalSecs % 60;
+            return {
+              ...prev,
+              durationSeconds: totalSecs,
+              duration: `${mins}:${secs.toString().padStart(2, "0")}`,
+            };
+          });
+        }
+
+        if (transcript) {
+          toast.info("Transcript extracted successfully", { description: `Source: ${transcriptData.source}` });
+        } else {
+          toast.info("No captions found — AI will analyze based on video context");
+        }
+      }
+    } catch (e) {
+      console.warn("Transcript extraction failed, continuing without:", e);
+      toast.info("Transcript unavailable — AI will generate based on title");
+    }
+
+    // Step 3 — AI Analysis
     setStep("analyzing");
 
     try {
@@ -64,7 +98,7 @@ export function useVideoAnalysis() {
         body: {
           youtubeUrl: inputUrl,
           videoTitle,
-          transcript: null, // No transcript extraction yet - AI generates based on video context
+          transcript,
         },
       });
 
@@ -86,7 +120,7 @@ export function useVideoAnalysis() {
       }
 
       setStep("detecting");
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 600));
 
       if (data?.clips && Array.isArray(data.clips)) {
         setClips(data.clips);
