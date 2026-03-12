@@ -2,3 +2,6 @@ project_id = "wnnawgssqlvqqcqmkboq"
 
 [functions.analyze-video]
 verify_jwt = false
+
+[functions.fetch-transcript]
+verify_jwt = false
